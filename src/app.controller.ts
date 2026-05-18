@@ -3,6 +3,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   NotFoundException,
   Param,
   Post,
@@ -22,6 +24,7 @@ export class AppController {
   }
 
   @Post('v1/asterisk/events')
+  @HttpCode(HttpStatus.CREATED)
   async ingestAsteriskEvent(@Body() body: AsteriskEvent) {
     try {
       await this.appService.ingestAsteriskEvent(body);

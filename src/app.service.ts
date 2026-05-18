@@ -22,7 +22,7 @@ export interface CallLog {
 }
 
 export interface AsteriskEvent {
-  eventType: 'inbound' | 'oncall' | 'disconnected' | 'DNDon' | 'DNDoff';
+  eventType: 'inbound' | 'oncall' | 'disconnected' | 'failed' | 'DNDon' | 'DNDoff';
   callId?: string;
   consultant?: string;
   phoneNumber?: string;
@@ -32,6 +32,10 @@ export interface AsteriskEvent {
   startTime?: string;
   endTime?: string;
   durationSeconds?: number;
+  sipResponseCode?: number;
+  sipResponseReason?: string;
+  endReason?: string;
+  outgoingNumber?: string;
 }
 
 @Injectable()
@@ -147,6 +151,16 @@ export class AppService implements OnModuleInit, OnModuleDestroy {
       if (event.durationSeconds !== undefined) {
         baseCall.durationSeconds = event.durationSeconds;
       } else if (baseCall.startTime) {
+        const seconds =
+          (Date.parse(baseCall.endTime) - Date.parse(baseCall.startTime)) / 1000;
+        baseCall.durationSeconds = Math.max(0, Math.floor(seconds));
+      }
+    }
+
+    if (event.eventType === 'failed') {
+      baseCall.status = event.status ?? 'failed';
+      baseCall.endTime = event.endTime ?? timestamp;
+      if (baseCall.startTime && baseCall.endTime) {
         const seconds =
           (Date.parse(baseCall.endTime) - Date.parse(baseCall.startTime)) / 1000;
         baseCall.durationSeconds = Math.max(0, Math.floor(seconds));
