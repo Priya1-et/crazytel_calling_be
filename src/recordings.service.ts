@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { createReadStream, existsSync, readdirSync, statSync } from 'fs';
+import { closeSync, createReadStream, existsSync, openSync, readSync, readdirSync, statSync } from 'fs';
 import { join, normalize, resolve } from 'path';
 import type { ReadStream } from 'fs';
 
@@ -10,8 +10,14 @@ export interface RecordingListItem {
   direction: RecordingDirection;
   filename: string;
   sizeBytes: number;
+  durationSeconds?: number;
   createdAt: string;
   streamUrl: string;
+}
+
+export interface RecordingStream {
+  stream: ReadStream;
+  sizeBytes: number;
 }
 
 @Injectable()
@@ -44,6 +50,7 @@ export class RecordingsService {
           direction: dir,
           filename,
           sizeBytes: stat.size,
+          durationSeconds: this.getWavDurationSeconds(fullPath, stat.size),
           createdAt: stat.mtime.toISOString(),
           streamUrl: `/v1/recordings/stream?path=${encodeURIComponent(id)}`,
         });
@@ -54,11 +61,51 @@ export class RecordingsService {
   }
 
   openStream(relativePath: string): ReadStream {
+    return this.openStreamWithMeta(relativePath).stream;
+  }
+
+  openStreamWithMeta(relativePath: string): RecordingStream {
     const safe = this.resolveSafePath(relativePath);
     if (!existsSync(safe)) {
       throw new NotFoundException(`Recording not found: ${relativePath}`);
     }
-    return createReadStream(safe);
+    const stat = statSync(safe);
+    return {
+      stream: createReadStream(safe),
+      sizeBytes: stat.size,
+    };
+  }
+
+  private getWavDurationSeconds(filePath: string, fileSize: number): number | undefined {
+    try {
+      const fd = openSync(filePath, 'r');
+      const header = Buffer.alloc(512);
+      const bytesRead = readSync(fd, header, 0, header.length, 0);
+      closeSync(fd);
+      if (bytesRead < 44 || header.toString('ascii', 0, 4) !== 'RIFF') {
+        return undefined;
+      }
+
+      const byteRate = header.readUInt32LE(28);
+      if (byteRate <= 0) {
+        return undefined;
+      }
+
+      let offset = 12;
+      while (offset + 8 <= bytesRead) {
+        const chunkId = header.toString('ascii', offset, offset + 4);
+        const chunkSize = header.readUInt32LE(offset + 4);
+        if (chunkId === 'data') {
+          return Math.max(0, Math.round(chunkSize / byteRate));
+        }
+        offset += 8 + chunkSize;
+      }
+
+      const dataSize = Math.max(0, fileSize - 44);
+      return Math.max(0, Math.round(dataSize / byteRate));
+    } catch {
+      return undefined;
+    }
   }
 
   private resolveSafePath(relativePath: string): string {
