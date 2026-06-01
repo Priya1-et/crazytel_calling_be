@@ -5,6 +5,7 @@ export type CallDirection = 'inbound' | 'outbound';
 export type CallStatus =
   | 'ringing'
   | 'answered'
+  | 'on-hold'
   | 'missed'
   | 'rejected'
   | 'disconnected'
@@ -22,7 +23,15 @@ export interface CallLog {
 }
 
 export interface AsteriskEvent {
-  eventType: 'inbound' | 'oncall' | 'disconnected' | 'failed' | 'DNDon' | 'DNDoff';
+  eventType:
+    | 'inbound'
+    | 'oncall'
+    | 'hold'
+    | 'resume'
+    | 'disconnected'
+    | 'failed'
+    | 'DNDon'
+    | 'DNDoff';
   callId?: string;
   consultant?: string;
   phoneNumber?: string;
@@ -143,6 +152,14 @@ export class AppService implements OnModuleInit, OnModuleDestroy {
       baseCall.status = event.status ?? 'ringing';
       baseCall.direction = direction;
       baseCall.startTime = event.startTime ?? baseCall.startTime;
+    }
+
+    if (event.eventType === 'hold') {
+      baseCall.status = 'on-hold';
+    }
+
+    if (event.eventType === 'resume') {
+      baseCall.status = 'answered';
     }
 
     if (event.eventType === 'disconnected') {
