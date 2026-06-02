@@ -149,6 +149,7 @@ export class AppService implements OnModuleInit, OnModuleDestroy {
       };
       this.calls.set(callId, missedLog);
       await this.persistCall(missedLog);
+      await this.resolveWaitingCalls(event.consultant, event.phoneNumber, 'missed');
       return;
     }
 
@@ -212,7 +213,6 @@ export class AppService implements OnModuleInit, OnModuleDestroy {
       event.phoneNumber &&
       (event.eventType === 'oncall' ||
         (event.eventType === 'inbound' && event.status === 'answered') ||
-        event.eventType === 'missed' ||
         event.eventType === 'disconnected')
     ) {
       await this.resolveWaitingCalls(event.consultant, event.phoneNumber, event.eventType);
