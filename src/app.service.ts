@@ -4,6 +4,7 @@ import { Pool } from 'pg';
 export type CallDirection = 'inbound' | 'outbound';
 export type CallStatus =
   | 'ringing'
+  | 'waiting'
   | 'answered'
   | 'on-hold'
   | 'missed'

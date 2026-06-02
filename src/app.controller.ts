@@ -43,7 +43,16 @@ export class AppController {
     @Query('status') status?: string,
   ) {
     const parsedLimit = limit ? Number.parseInt(limit, 10) : 100;
-    const allowed = ['ringing', 'answered', 'on-hold', 'missed', 'rejected', 'disconnected', 'failed'] as const;
+    const allowed = [
+      'ringing',
+      'waiting',
+      'answered',
+      'on-hold',
+      'missed',
+      'rejected',
+      'disconnected',
+      'failed',
+    ] as const;
     const statusFilter = allowed.includes(status as (typeof allowed)[number])
       ? (status as (typeof allowed)[number])
       : undefined;
