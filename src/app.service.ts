@@ -28,6 +28,7 @@ export interface AsteriskEvent {
     | 'oncall'
     | 'hold'
     | 'resume'
+    | 'missed'
     | 'disconnected'
     | 'failed'
     | 'DNDon'
@@ -131,6 +132,25 @@ export class AppService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
+    if (event.eventType === 'missed') {
+      if (!event.consultant || !event.phoneNumber) {
+        throw new Error('consultant and phoneNumber are required for missed events');
+      }
+      const callId = event.callId ?? `missed-${event.phoneNumber}-${Date.now()}`;
+      const missedLog: CallLog = {
+        callId,
+        consultant: event.consultant,
+        phoneNumber: event.phoneNumber,
+        direction: 'inbound',
+        status: 'missed',
+        startTime: event.timestamp ?? new Date().toISOString(),
+        endTime: event.timestamp ?? new Date().toISOString(),
+      };
+      this.calls.set(callId, missedLog);
+      await this.persistCall(missedLog);
+      return;
+    }
+
     if (!event.callId || !event.consultant || !event.phoneNumber) {
       throw new Error('callId, consultant and phoneNumber are required for call events');
     }
@@ -206,11 +226,14 @@ export class AppService implements OnModuleInit, OnModuleDestroy {
     return Object.fromEntries(this.dndState.entries());
   }
 
-  listCalls(limit = 100, consultant?: string): CallLog[] {
+  listCalls(limit = 100, consultant?: string, status?: CallStatus): CallLog[] {
     const allCalls = [...this.calls.values()];
-    const filtered = consultant
+    let filtered = consultant
       ? allCalls.filter((call) => call.consultant === consultant)
       : allCalls;
+    if (status) {
+      filtered = filtered.filter((call) => call.status === status);
+    }
     return filtered
       .sort((a, b) => Date.parse(b.startTime) - Date.parse(a.startTime))
       .slice(0, Math.max(1, Math.min(limit, 500)));

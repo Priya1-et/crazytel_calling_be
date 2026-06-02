@@ -37,9 +37,21 @@ export class AppController {
   }
 
   @Get('v1/calls')
-  getCalls(@Query('limit') limit?: string, @Query('consultant') consultant?: string) {
+  getCalls(
+    @Query('limit') limit?: string,
+    @Query('consultant') consultant?: string,
+    @Query('status') status?: string,
+  ) {
     const parsedLimit = limit ? Number.parseInt(limit, 10) : 100;
-    return this.appService.listCalls(Number.isNaN(parsedLimit) ? 100 : parsedLimit, consultant);
+    const allowed = ['ringing', 'answered', 'on-hold', 'missed', 'rejected', 'disconnected', 'failed'] as const;
+    const statusFilter = allowed.includes(status as (typeof allowed)[number])
+      ? (status as (typeof allowed)[number])
+      : undefined;
+    return this.appService.listCalls(
+      Number.isNaN(parsedLimit) ? 100 : parsedLimit,
+      consultant,
+      statusFilter,
+    );
   }
 
   @Get('v1/calls/:callId')
