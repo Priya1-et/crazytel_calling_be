@@ -206,7 +206,44 @@ export class AppService implements OnModuleInit, OnModuleDestroy {
     }
 
     this.calls.set(baseCall.callId, baseCall);
+
+    if (
+      event.consultant &&
+      event.phoneNumber &&
+      (event.eventType === 'oncall' ||
+        (event.eventType === 'inbound' && event.status === 'answered') ||
+        event.eventType === 'missed' ||
+        event.eventType === 'disconnected')
+    ) {
+      await this.resolveWaitingCalls(event.consultant, event.phoneNumber, event.eventType);
+    }
+
     await this.persistCall(baseCall);
+  }
+
+  /** Stale `waiting` rows from Asterisk queue polling should not linger after answer/missed. */
+  private async resolveWaitingCalls(
+    consultant: string,
+    phoneNumber: string,
+    reason: AsteriskEvent['eventType'],
+  ): Promise<void> {
+    const nextStatus =
+      reason === 'missed' || reason === 'disconnected' ? 'missed' : 'answered';
+    for (const [id, call] of this.calls) {
+      if (
+        call.consultant === consultant &&
+        call.phoneNumber === phoneNumber &&
+        call.status === 'waiting'
+      ) {
+        const updated: CallLog = {
+          ...call,
+          status: nextStatus,
+          endTime: new Date().toISOString(),
+        };
+        this.calls.set(id, updated);
+        await this.persistCall(updated);
+      }
+    }
   }
 
   async setDnd(consultant: string, enabled: boolean): Promise<void> {
